@@ -31,7 +31,7 @@ const MATCHES = [
     region: 'Áncash',
     career: 'Ingeniería',
     cycle: '5.º ciclo',
-    university: 'PUCP',
+    university: 'UPC',
     avatar: '🧑🏽',
     role: '🌱 Padrino foráneo · perfil de ejemplo',
     day: 'martes',
@@ -46,33 +46,41 @@ const MATCHES = [
 const $ = (id) => document.getElementById(id);
 const screens = Array.from(document.querySelectorAll('.screen'));
 
+// Imagen de la pantalla 1: usa ImagenFO1 (prueba varias extensiones comunes)
+(function setupHeroImage() {
+  const img = $('hero-img');
+  if (!img) return;
+  const exts = ['png', 'jpg', 'jpeg', 'webp', 'PNG', 'JPG', 'JPEG'];
+  let i = 0;
+  img.addEventListener('error', () => {
+    i += 1;
+    if (i < exts.length) img.src = `ImagenFO1.${exts[i]}`;
+  });
+})();
+
 function getFormData() {
   return {
-    name: $('f-name').value.trim() || 'Lucía',
+    name: $('f-name').value.trim(),
     region: $('f-region').value,
     career: $('f-career').value,
     cycle: $('f-cycle').value,
     university: $('f-university').value,
-    email: $('f-email').value,
+    email: $('f-email').value.trim(),
     days: Array.from(document.querySelectorAll('#days-chips .chip.is-active')).map(c => c.dataset.day),
     timeslot: $('f-timeslot').value,
     zone: $('f-zone').value,
-    budget: Array.from(document.querySelectorAll('#budget-chips .chip.is-active')).map(c => c.dataset.budget)[0] || 'S/10–20',
-    support: (document.querySelector('input[name="support"]:checked') || {}).value || 'Ambos',
+    budget: Array.from(document.querySelectorAll('#budget-chips .chip.is-active')).map(c => c.dataset.budget)[0] || '',
+    support: (document.querySelector('input[name="support"]:checked') || {}).value || '',
     weekend: $('f-weekend').value,
   };
 }
 
-// ---------- navegación entre pantallas ----------
+// ---------- navegación entre pantallas (sin desplazamiento lateral) ----------
 function goToScreen(n, { isBack = false, skipHistory = false } = {}) {
   const target = screens.find(s => Number(s.dataset.screen) === n);
   if (!target) return;
 
-  screens.forEach(s => {
-    s.classList.remove('is-active', 'is-leaving-back');
-  });
-
-  if (isBack) target.classList.add('is-leaving-back');
+  screens.forEach(s => s.classList.remove('is-active'));
   target.classList.add('is-active');
 
   // reset scroll position
@@ -161,50 +169,64 @@ function updateGoalCta() {
 // ---------- pantalla 4: animación de procesamiento ----------
 function runProcessingScreen() {
   const data = getFormData();
-  $('scan-detail').textContent = `${data.region} · ${data.zone}`;
-  $('scan-detail-2').textContent = `${data.days.join(' y ') || 'Por definir'}, ${data.timeslot} · ${data.budget}`;
+  const place = [data.region, data.zone].filter(Boolean).join(' · ') || 'Por definir';
+  const when = [
+    data.days.join(' y ') || 'Días por definir',
+    data.timeslot,
+  ].filter(Boolean).join(', ');
+  $('scan-detail').textContent = place;
+  $('scan-detail-2').textContent = `${when} · ${data.budget || 'Presupuesto por definir'}`;
 
-  // reinicia la animación del anillo/semilla cada vez que se entra
+  // reinicia la animación del anillo (giratorio) y la semilla cada vez que se entra
   const ring = document.querySelector('.ring-fill');
   const seed = document.querySelector('.grow-seed');
   [ring, seed].forEach(el => {
     el.style.animation = 'none';
-    void el.offsetWidth; // reflow para reiniciar
+    void el.getBoundingClientRect(); // reflow para reiniciar
     el.style.animation = '';
   });
 
   clearTimeout(state._procTimer);
   state._procTimer = setTimeout(() => {
     if (state.currentScreen === 4) goToScreen(5);
-  }, 2400);
+  }, 3200);
 }
 
 // ---------- pantalla 5: resultado dinámico ----------
-function buildMessage(data, match) {
-  return `Hola, ${match.name.split(',')[0]} :) Soy ${data.name}, también de ${data.region} y estudio ${data.career} en ${data.university}. Vi que estamos por ${data.zone} y libres los ${data.days.join(' y ') || match.day}. ¿Te anima a ${match.planTitle.toLowerCase()} el ${match.day} a las ${match.time}? Mi presupuesto es de ${data.budget}. Podemos conocernos primero en un espacio compartido. ¡Sin presión!`;
-}
-
 function renderResultScreen() {
   const data = getFormData();
   const match = MATCHES[state.altIndex % MATCHES.length];
+  const zone = data.zone || 'tu zona';
+  const budget = data.budget || 'tu rango de presupuesto';
 
-  $('result-lead').textContent = `${data.name}, podrían empezar con algo rico, sencillo y dentro de tu presupuesto.`;
+  $('result-lead').textContent = `${data.name ? data.name + ', podrían' : 'Podrían'} empezar con algo rico, sencillo y dentro de tu presupuesto.`;
   $('match-name').textContent = match.name;
-  $('match-meta').textContent = `${match.region} · ${data.zone}`;
+  $('match-meta').textContent = `${match.region} · ${zone}`;
   $('match-career').textContent = `${match.career} · ${match.cycle} · ${match.university}`;
   document.querySelector('#screen-5 .match-avatar').textContent = match.avatar;
   document.querySelector('#screen-5 .match-tag').textContent = match.role;
 
-  $('match-reason').textContent = `También es de ${match.region} y se mueve por ${data.zone}. Coinciden el ${match.day} a las ${match.time} y buscan planes de ${data.budget}. Además, conoce tu carrera.`;
+  $('match-reason').textContent = `Se mueve por ${zone}. Coinciden el ${match.day} a las ${match.time} y buscan planes de ${budget}. Además, conoce tu carrera.`;
 
   $('plan-title').textContent = match.planTitle;
   $('plan-detail').textContent = `${match.day.charAt(0).toUpperCase() + match.day.slice(1)} · ${match.time}`;
   $('plan-place').textContent = match.place;
   $('plan-price-num').textContent = match.priceLabel;
-  $('plan-note').textContent = `Estimado; puede variar. Acuerden el gasto antes. Dentro de tu rango de ${data.budget}.`;
+  $('plan-note').textContent = `Estimado; puede variar. Acuerden el gasto antes.${data.budget ? ' Tu rango: ' + data.budget + '.' : ''}`;
 
-  $('message-draft').value = buildMessage(data, match);
+  // El mensaje NO se rellena: lo escribe la persona.
+  updateReviewButton();
 }
+
+function updateReviewButton() {
+  const hasText = $('message-draft').value.trim().length > 0;
+  $('review-btn').disabled = !hasText;
+  $('message-hint').textContent = hasText
+    ? 'Puedes cambiarlo para que suene a ti.'
+    : 'Escribe tu mensaje para poder continuar.';
+}
+
+$('message-draft').addEventListener('input', updateReviewButton);
 
 $('alt-suggestion-btn').addEventListener('click', () => {
   state.altIndex += 1;
@@ -215,8 +237,8 @@ $('alt-suggestion-btn').addEventListener('click', () => {
 function renderReviewScreen() {
   const data = getFormData();
   const match = MATCHES[state.altIndex % MATCHES.length];
-  $('review-sub').textContent = `Este es tu mensaje, ${data.name}. Léelo una vez más, sin apuro.`;
-  $('review-to-name').textContent = `${match.name.split(',')[0]} · Paisanos`;
+  $('review-sub').textContent = `Este es tu mensaje${data.name ? ', ' + data.name : ''}. Léelo una vez más, sin apuro.`;
+  $('review-to-name').textContent = `${match.name.split(',')[0]} · Foráneos`;
   $('message-final').textContent = $('message-draft').value;
   document.querySelector('#review-state .match-avatar').textContent = match.avatar;
   document.querySelector('.message-to-meta').textContent = match.role.replace('🌱 ', '');
@@ -252,11 +274,29 @@ $('send-btn').addEventListener('click', () => {
   }, 900);
 });
 
+// ---------- reiniciar demo (deja todo vacío otra vez) ----------
+function resetForm() {
+  $('f-name').value = '';
+  $('f-email').value = '';
+  ['f-region', 'f-career', 'f-cycle', 'f-university', 'f-timeslot', 'f-zone', 'f-weekend']
+    .forEach(id => { $(id).selectedIndex = 0; });
+  document.querySelectorAll('#days-chips .chip, #budget-chips .chip').forEach(c => c.classList.remove('is-active'));
+  document.querySelectorAll('input[name="support"]').forEach(r => { r.checked = false; });
+  $('message-draft').value = '';
+
+  state.verified = false;
+  $('verify-btn').disabled = false;
+  $('verify-btn').innerHTML = 'Verificar mi correo <span>✉️</span>';
+  $('verify-status').textContent = 'Aún no se ha enviado ningún correo.';
+  $('verify-status').classList.remove('is-verified');
+}
+
 $('restart-btn').addEventListener('click', () => {
   state.altIndex = 0;
   state.goal = 'practica';
   state.history = [1];
   $('send-btn').dataset.sent = 'false';
+  resetForm();
   goalCards.forEach(c => c.classList.remove('is-selected'));
   document.querySelector('.goal-card[data-goal="practica"]').classList.add('is-selected');
   updateGoalCta();
